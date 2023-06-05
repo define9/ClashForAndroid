@@ -1,8 +1,10 @@
 package com.github.kr328.clash.service.util
 
+import com.github.kr328.clash.common.log.Log
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
+import java.net.NetworkInterface
 
 fun InetAddress.asSocketAddressText(port: Int): String {
     return when (this) {
@@ -12,6 +14,29 @@ fun InetAddress.asSocketAddressText(port: Int): String {
             "${this.hostAddress}:$port"
         else -> throw IllegalArgumentException("Unsupported Inet type ${this.javaClass}")
     }
+}
+
+fun getHostIp(): String {
+    val networkInterfaces = NetworkInterface.getNetworkInterfaces()
+    val ips = ArrayList<String>()
+
+    while (networkInterfaces?.hasMoreElements() == true) {
+        val net = networkInterfaces.nextElement()
+        if (net.isLoopback) continue
+
+        val addresses = net.inetAddresses
+        while (addresses.hasMoreElements()) {
+            val address = addresses.nextElement()
+            if (address is Inet6Address || address?.hostAddress == null) continue
+
+            val ip = address.hostAddress as String
+            // 找到, 全部打印
+            Log.i("find IP: $ip")
+            ips.add(ip)
+        }
+    }
+
+    return ips.first()
 }
 
 private const val INT16SZ = 2

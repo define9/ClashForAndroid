@@ -1,7 +1,12 @@
 package com.github.kr328.clash.design
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
+import android.util.Log
 import android.view.View
+import android.widget.Toast
+import androidx.core.content.getSystemService
 import com.github.kr328.clash.core.model.ConfigurationOverride
 import com.github.kr328.clash.core.model.LogMessage
 import com.github.kr328.clash.core.model.TunnelState
@@ -16,6 +21,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import com.github.kr328.clash.service.util.getHostIp
 import kotlin.coroutines.resume
 
 class OverrideSettingsDesign(
@@ -163,12 +169,47 @@ class OverrideSettingsDesign(
                 placeholder = R.string.dont_modify,
             )
 
+            var hostIp: ClickablePreference? = null
+            fun getIp() {
+                Log.d("define9", "getIp: $hostIp")
+                hostIp?.enabled = true
+                hostIp?.summary = "${getHostIp()}:${configuration.mixedPort?:7890}"
+            }
+
             selectableList(
                 value = configuration::allowLan,
                 values = booleanValues,
                 valuesText = booleanValuesText,
                 title = R.string.allow_lan,
-            )
+            ) {
+                listener = OnChangedListener {
+                    if (configuration.allowLan == true) {
+                        getIp()
+                    } else {
+                        hostIp?.enabled = false
+                        hostIp?.summary = context.getText(R.string.disabled)
+                    }
+                }
+            }
+
+            clickable(
+                title = R.string.host_ip,
+                summary = R.string.disabled,
+            ) {
+                hostIp = this
+                enabled = configuration.allowLan?:false
+                clicked {
+                    if (configuration.allowLan == true) {
+                        val data = ClipData.newPlainText("host_ip", this.summary)
+                        context.getSystemService<ClipboardManager>()?.setPrimaryClip(data)
+                        Toast.makeText(context, R.string.copied, Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                if (enabled) {
+                    getIp()
+                }
+            }
 
             selectableList(
                 value = configuration::ipv6,
