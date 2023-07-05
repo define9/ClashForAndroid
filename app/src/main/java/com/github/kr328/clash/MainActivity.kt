@@ -3,8 +3,12 @@ package com.github.kr328.clash
 import androidx.activity.result.contract.ActivityResultContracts
 import com.github.kr328.clash.common.util.intent
 import com.github.kr328.clash.common.util.ticker
+import com.github.kr328.clash.core.Clash
+import com.github.kr328.clash.core.model.TunnelState
 import com.github.kr328.clash.design.MainDesign
+import com.github.kr328.clash.design.dialog.requestModelTextInput
 import com.github.kr328.clash.design.ui.ToastDuration
+import com.github.kr328.clash.service.model.Profile
 import com.github.kr328.clash.store.TipsStore
 import com.github.kr328.clash.util.startClashService
 import com.github.kr328.clash.util.stopClashService
@@ -15,6 +19,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
+import java.util.*
 import java.util.concurrent.TimeUnit
 
 class MainActivity : BaseActivity<MainDesign>() {
@@ -30,6 +35,13 @@ class MainActivity : BaseActivity<MainDesign>() {
         design.fetch()
 
         val ticker = ticker(TimeUnit.SECONDS.toMillis(1))
+
+        withProfile {
+            val profiles = queryAll()
+            if (profiles.isEmpty()) {
+                noobInit()
+            }
+        }
 
         while (isActive) {
             select<Unit> {
@@ -146,6 +158,43 @@ class MainActivity : BaseActivity<MainDesign>() {
     private suspend fun queryAppVersionName(): String {
         return withContext(Dispatchers.IO) {
             packageManager.getPackageInfo(packageName, 0).versionName
+        }
+    }
+
+    private suspend fun noobInit() {
+
+        launch {
+            // 1. 弹窗提示输入url
+            val initial = "请输入您的订阅网址"
+            val text = requestModelTextInput(
+                initial = initial,
+                title = "初始化助手",
+                hint = "网址",
+            )
+
+            if (text.isNotEmpty() && text != initial) {
+                withProfile {
+                    val uuid = create(
+                        Profile.Type.Url,
+                        Date().toString(),
+                        text,
+                    )
+
+                    commit(uuid)
+
+                    val profile = queryByUUID(uuid)
+                    setActive(profile!!)
+                }
+            }
+        }
+
+        launch {
+            // 2. 模式设置为全局模式
+            withClash {
+                val o = queryOverride(Clash.OverrideSlot.Persist)
+                o.mode = TunnelState.Mode.Global
+                patchOverride(Clash.OverrideSlot.Persist, o)
+            }
         }
     }
 }
